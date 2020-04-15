@@ -1,5 +1,7 @@
 from __future__ import annotations
-from typing import List, Dict, Iterable, Tuple
+from copy import copy
+from typing import List, Dict, Iterable, Tuple, Generator, Set
+from itertools import permutations
 import numpy as np
 
 
@@ -24,6 +26,7 @@ class WordTree:
             self.add_word(word)
 
     def add_word(self, word: str):
+        ''' inserts a word into the word tree '''
         if len(word) >= self.min_len:
             if word[0] in self.children:
                 self.children[word[0]].add_word(word[1:])
@@ -38,6 +41,19 @@ class WordTree:
 
     def __eq__(self, other):
         return self.children == other.children
+
+    def __contains__(self, word):
+        ''' True if word contained in self.
+        DOES NOT DEFINE LEGAL WORDS, also defines all SUBSTRINGS of legal
+        words starting at index 0. EG if self == WordTree([ABCD]), is a legal
+        word, then AB will also be contained. '''
+        if len(word) == 0:
+            return False
+        if word[0] not in self.children:
+            return False
+        if len(word) == 1:
+            return True
+        return word[1:] in self.children[word[0]]
 
 
 class Board:
@@ -55,6 +71,31 @@ class Board:
         return '\n'.join(lines)
 
     def traverse(self,
-                 xy: Tuple[int, int],
-                 visited: List[Tuple[int, int]] = None) -> List[str]:
-        pass
+                 x: int,
+                 y: int,
+                 legal_words: WordTree,
+                 visited: Set[Tuple[int, int]] = None
+                 ) -> Generator[str, None, None]:
+        if len(self.board_state[0]) <= x or x < 0 or len(
+                self.board_state) <= y or y < 0:
+            return  # this coordinate is out of bounds, dont yield anything
+        if visited is None:
+            visited = set()
+        else:
+            if (x, y) in visited:
+                return  # dont yield anything
+        # have now visited this square.
+        visited.add((x, y))
+
+        # visit this square
+        yield self.board_state[y][x]
+
+        # visit all squares around this square
+        for nx, ny in [(x - 1, y - 1), (x, y - 1), (x + 1, y - 1), (x + 1, y),
+                       (x + 1, y + 1), (x, y + 1), (x - 1, y + 1), (x - 1, y)]:
+            for option in self.traverse(
+                    nx,
+                    ny,
+                    legal_words.children[self.board_state[y][x]],
+                    visited=copy(visited)):
+                yield self.board_state[y][x] + option
